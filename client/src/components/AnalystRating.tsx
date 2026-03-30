@@ -1,44 +1,7 @@
 import type { Grades } from "@shared/schema";
-import { Badge } from "@/components/ui/badge";
 
 interface AnalystRatingProps {
   grades?: Grades;
-}
-
-// Get consensus color
-function getConsensusColor(consensus: string): string {
-  switch (consensus) {
-    case 'Strong Buy':
-      return 'bg-emerald-600 hover:bg-emerald-700 text-white';
-    case 'Buy':
-      return 'bg-emerald-500 hover:bg-emerald-600 text-white';
-    case 'Hold':
-      return 'bg-amber-500 hover:bg-amber-600 text-white';
-    case 'Sell':
-      return 'bg-orange-500 hover:bg-orange-600 text-white';
-    case 'Strong Sell':
-      return 'bg-red-600 hover:bg-red-700 text-white';
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
-}
-
-// Get consensus label
-function getConsensusLabel(consensus: string): string {
-  switch (consensus) {
-    case 'Strong Buy':
-      return '强烈买入';
-    case 'Buy':
-      return '买入';
-    case 'Hold':
-      return '持有';
-    case 'Sell':
-      return '卖出';
-    case 'Strong Sell':
-      return '强烈卖出';
-    default:
-      return '暂无评级';
-  }
 }
 
 export function AnalystRating({ grades }: AnalystRatingProps) {
@@ -61,54 +24,63 @@ export function AnalystRating({ grades }: AnalystRatingProps) {
   }
 
   const data = [
-    { label: 'Strong Buy', value: grades.strongBuy, color: 'bg-emerald-600', textColor: 'text-emerald-600' },
-    { label: 'Buy', value: grades.buy, color: 'bg-emerald-400', textColor: 'text-emerald-400' },
-    { label: 'Hold', value: grades.hold, color: 'bg-amber-500', textColor: 'text-amber-500' },
-    { label: 'Sell', value: grades.sell, color: 'bg-orange-500', textColor: 'text-orange-500' },
-    { label: 'Strong Sell', value: grades.strongSell, color: 'bg-red-600', textColor: 'text-red-600' },
+    { label: '强烈买入', value: grades.strongBuy, color: 'bg-emerald-600', textColor: 'text-emerald-600' },
+    { label: '买入', value: grades.buy, color: 'bg-emerald-400', textColor: 'text-emerald-500' },
+    { label: '持有', value: grades.hold, color: 'bg-amber-500', textColor: 'text-amber-500' },
+    { label: '卖出', value: grades.sell, color: 'bg-orange-500', textColor: 'text-orange-500' },
+    { label: '强烈卖出', value: grades.strongSell, color: 'bg-red-600', textColor: 'text-red-600' },
   ];
 
-  return (
-    <div className="space-y-4">
-      {/* Consensus Badge */}
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">分析师共识</span>
-        <Badge 
-          className={`text-sm px-3 py-1 ${getConsensusColor(grades.consensus)}`}
-        >
-          {getConsensusLabel(grades.consensus)}
-        </Badge>
-      </div>
+  // 找出最大值用于计算比例
+  const maxValue = Math.max(...data.map(d => d.value), 1);
 
-      {/* Horizontal Bar Chart */}
+  return (
+    <div className="space-y-3">
+      {/* 标题 */}
+      <h4 className="text-sm font-medium">分析师评级分布</h4>
+
+      {/* 横向柱状图 - 自适应宽度布局 */}
       <div className="space-y-2">
         {data.map((item) => {
           const percentage = total > 0 ? (item.value / total) * 100 : 0;
+          const barWidth = maxValue > 0 ? (item.value / maxValue) * 100 : 0;
+          
           return (
-            <div key={item.label} className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground w-20">{item.label}</span>
-                <div className="flex items-center gap-2 flex-1">
-                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full ${item.color} transition-all`}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                  <span className={`font-medium w-8 ${item.textColor}`}>{item.value}</span>
-                  <span className="text-muted-foreground w-12 text-right">{percentage.toFixed(0)}%</span>
-                </div>
+            <div key={item.label} className="flex items-center gap-3 text-left">
+              {/* 标签 - 固定宽度左对齐 */}
+              <div className="text-xs text-muted-foreground w-14 shrink-0">
+                {item.label}
+              </div>
+              
+              {/* 进度条 - 自适应铺满剩余空间 */}
+              <div className="flex-1 h-4 bg-muted/50 rounded-full overflow-hidden relative">
+                <div 
+                  className={`h-full ${item.color} transition-all duration-500 ease-out rounded-full`}
+                  style={{ width: `${barWidth}%` }}
+                />
+                {/* 数值显示 */}
+                {item.value > 0 && (
+                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white drop-shadow">
+                    {item.value}
+                  </span>
+                )}
+              </div>
+              
+              {/* 百分比 - 固定宽度 */}
+              <div className="w-10 shrink-0">
+                <span className={`text-xs ${item.textColor} font-medium`}>
+                  {percentage.toFixed(0)}%
+                </span>
               </div>
             </div>
           );
         })}
       </div>
-
-      {/* Total and Last Updated */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
-        <span>总计: {total} 位分析师</span>
-        <span>更新于: {new Date(grades.lastUpdated).toLocaleDateString()}</span>
-      </div>
+      
+      {/* 统计信息 */}
+      <p className="text-xs text-muted-foreground pt-1">
+        共 {total} 位分析师 · 更新于 {new Date(grades.lastUpdated).toLocaleDateString()}
+      </p>
     </div>
   );
 }

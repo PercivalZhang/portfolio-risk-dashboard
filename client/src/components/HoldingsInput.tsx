@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { RefreshProgress } from "./RefreshProgress";
 import { AnalystRating } from "./AnalystRating";
+import { ConsensusWatermark } from "./ConsensusSeal";
 import type { Holding } from "@shared/schema";
 import { Plus, Trash2, RefreshCw, RotateCw, Pencil, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -518,7 +519,7 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
   const isPositive = (h.changePercentage ?? 0) >= 0;
   
   return (
-    <>
+    <div className="relative">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-3">
           <span className="text-2xl">{h.ticker}</span>
@@ -632,12 +633,18 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
           
           {/* Analyst Rating */}
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">分析师评级</h3>
             <AnalystRating grades={h.grades} />
           </div>
         </div>
       </div>
-    </>
+      
+      {/* 正式徽章 - 紧贴详情窗口上沿右上角 */}
+      {h.grades && (
+        <div className="absolute -top-0 right-16 z-20 hidden md:flex">
+          <ConsensusWatermark consensus={h.grades.consensus} />
+        </div>
+      )}
+    </div>
   );
 }
 
