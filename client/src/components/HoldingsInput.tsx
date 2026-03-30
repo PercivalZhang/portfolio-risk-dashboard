@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { RefreshProgress } from "./RefreshProgress";
+import { AnalystRating } from "./AnalystRating";
 import type { Holding } from "@shared/schema";
 import { Plus, Trash2, RefreshCw, RotateCw, Pencil, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -149,7 +150,11 @@ export function HoldingsInput({ holdings, onDelete }: { holdings: Holding[]; onD
       }));
       
       try {
-        const res = await apiRequest("POST", `/api/holdings/${holding.id}/refresh`);
+        // Pass grades lastUpdated timestamp to determine if refresh is needed
+        const gradesLastUpdated = holding.grades?.lastUpdated;
+        const res = await apiRequest("POST", `/api/holdings/${holding.id}/refresh`, {
+          gradesLastUpdated,
+        });
         const data = await res.json();
         results.push({ 
           ticker: holding.ticker, 
@@ -189,12 +194,14 @@ export function HoldingsInput({ holdings, onDelete }: { holdings: Holding[]; onD
     }, 1000);
   }, [holdings]);
 
-  const refreshSingle = async (id: number, ticker: string) => {
+  const refreshSingle = async (id: number, ticker: string, gradesLastUpdated?: string) => {
     if (refreshingIds.has(id)) return;
     
     setRefreshingIds(prev => new Set(prev).add(id));
     try {
-      const res = await apiRequest("POST", `/api/holdings/${id}/refresh`);
+      const res = await apiRequest("POST", `/api/holdings/${id}/refresh`, {
+        gradesLastUpdated,
+      });
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/holdings"] });
       setDataUpdated(true);
@@ -340,7 +347,7 @@ export function HoldingsInput({ holdings, onDelete }: { holdings: Holding[]; onD
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      refreshSingle(h.id, h.ticker);
+                      refreshSingle(h.id, h.ticker, h.grades?.lastUpdated);
                     }}
                     disabled={refreshingIds.has(h.id)}
                     className="absolute top-1.5 left-1.5 p-1 rounded-full hover:bg-background/50 transition-opacity z-10"
@@ -621,6 +628,12 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
                 isLow
               />
             )}
+          </div>
+          
+          {/* Analyst Rating */}
+          <div className="mt-6">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">分析师评级</h3>
+            <AnalystRating grades={h.grades} />
           </div>
         </div>
       </div>

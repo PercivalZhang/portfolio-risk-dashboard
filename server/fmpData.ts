@@ -25,6 +25,16 @@ export interface FMPQuoteData {
   sma200?: number; // 200-day Simple Moving Average (priceAvg200)
   // Profile update tracking
   profileUpdated?: boolean; // Whether profile was refreshed
+  // Analyst grades
+  grades?: {
+    strongBuy: number;
+    buy: number;
+    hold: number;
+    sell: number;
+    strongSell: number;
+    consensus: 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell' | 'N/A';
+    gradesUpdated?: boolean; // Whether grades were refreshed
+  };
 }
 
 // FMP has different endpoints: /api/v3 (older) and /stable (newer)
@@ -69,6 +79,47 @@ async function fetchFMPProfile(ticker: string, apiKey: string): Promise<FMPProfi
     if (!resp.ok) return null;
     
     const data = await resp.json() as FMPProfileData[];
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// FMP Analyst Grades - provides analyst consensus ratings
+// https://financialmodelingprep.com/stable/grades-consensus?symbol=AAPL&apikey=xxx
+interface FMPGradesData {
+  symbol: string;
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+  consensus: 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell' | 'N/A';
+}
+
+// Grades refresh interval: 3 days in milliseconds
+const GRADES_REFRESH_INTERVAL = 3 * 24 * 60 * 60 * 1000;
+
+// Check if grades needs refresh based on lastUpdated timestamp
+export function needsGradesRefresh(lastUpdatedGrades?: string): boolean {
+  if (!lastUpdatedGrades) return true;
+  
+  const lastUpdate = new Date(lastUpdatedGrades).getTime();
+  const now = Date.now();
+  return (now - lastUpdate) > GRADES_REFRESH_INTERVAL;
+}
+
+export async function fetchFMPGrades(ticker: string, apiKey: string): Promise<FMPGradesData | null> {
+  try {
+    const url = `${BASE_URL}/grades-consensus?symbol=${ticker.toUpperCase()}&apikey=${apiKey}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    
+    if (!resp.ok) return null;
+    
+    const data = await resp.json() as FMPGradesData[];
     if (Array.isArray(data) && data.length > 0) {
       return data[0];
     }

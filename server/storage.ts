@@ -76,6 +76,15 @@ export class JsonFileStorage implements IStorage {
       sma200: quote?.sma200,
       marketCap: quote?.marketCap,
       logo: quote?.logo,
+      grades: quote?.grades ? {
+        strongBuy: quote.grades.strongBuy,
+        buy: quote.grades.buy,
+        hold: quote.grades.hold,
+        sell: quote.grades.sell,
+        strongSell: quote.grades.strongSell,
+        consensus: quote.grades.consensus,
+        lastUpdated: new Date().toISOString(),
+      } : undefined,
       lastUpdated: new Date().toISOString(),
       lastUpdatedProfile: quote?.profileUpdated ? new Date().toISOString() : undefined,
     };
@@ -109,6 +118,15 @@ export class JsonFileStorage implements IStorage {
       sma200: quote?.sma200 ?? existing.sma200,
       marketCap: quote?.marketCap ?? existing.marketCap,
       logo: quote?.logo ?? existing.logo,
+      grades: quote?.grades ? {
+        strongBuy: quote.grades.strongBuy,
+        buy: quote.grades.buy,
+        hold: quote.grades.hold,
+        sell: quote.grades.sell,
+        strongSell: quote.grades.strongSell,
+        consensus: quote.grades.consensus,
+        lastUpdated: new Date().toISOString(),
+      } : existing.grades,
       lastUpdated: new Date().toISOString(),
       lastUpdatedProfile: quote?.profileUpdated ? new Date().toISOString() : existing.lastUpdatedProfile,
     };
@@ -146,6 +164,17 @@ export class JsonFileStorage implements IStorage {
     holdings[index].sma200 = quote.sma200 ?? holdings[index].sma200;
     holdings[index].marketCap = quote.marketCap ?? holdings[index].marketCap;
     holdings[index].logo = quote.logo ?? holdings[index].logo;
+    if (quote.grades) {
+      holdings[index].grades = {
+        strongBuy: quote.grades.strongBuy,
+        buy: quote.grades.buy,
+        hold: quote.grades.hold,
+        sell: quote.grades.sell,
+        strongSell: quote.grades.strongSell,
+        consensus: quote.grades.consensus,
+        lastUpdated: new Date().toISOString(),
+      };
+    }
     holdings[index].lastUpdated = new Date().toISOString();
     if (quote.profileUpdated) {
       holdings[index].lastUpdatedProfile = new Date().toISOString();

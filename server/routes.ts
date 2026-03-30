@@ -2,7 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { insertHoldingSchema, updateHoldingSchema } from "@shared/schema";
-import { fetchFMPQuote, fetchFMPQuoteSmart, checkFMPStatus } from "./fmpData";
+import { fetchFMPQuote, fetchFMPQuoteSmart, fetchFMPGrades, needsGradesRefresh, checkFMPStatus } from "./fmpData";
 
 export function registerRoutes(server: Server, app: Express) {
   // Get all holdings
@@ -91,16 +91,45 @@ export function registerRoutes(server: Server, app: Express) {
     const holding = storage.getHolding(id);
     if (!holding) return res.status(404).json({ error: "Not found" });
 
+    // Get gradesLastUpdated from request body (if provided)
+    const { gradesLastUpdated } = req.body || {};
+
     // Smart fetch: will refresh profile only if lastUpdatedProfile is empty or > 3 days
     const quote = await fetchFMPQuoteSmart(holding.ticker, holding.lastUpdatedProfile);
     if (!quote || quote.price <= 0) {
       return res.status(502).json({ error: "Failed to fetch quote from FMP" });
     }
 
+    // Check if grades need refresh (3-day rule)
+    const shouldRefreshGrades = needsGradesRefresh(gradesLastUpdated || holding.grades?.lastUpdated);
+    
+    if (shouldRefreshGrades) {
+      try {
+        const grades = await fetchFMPGrades(holding.ticker, process.env.FMP_API_KEY || "");
+        if (grades) {
+          quote.grades = {
+            strongBuy: grades.strongBuy,
+            buy: grades.buy,
+            hold: grades.hold,
+            sell: grades.sell,
+            strongSell: grades.strongSell,
+            consensus: grades.consensus,
+            gradesUpdated: true,
+          };
+        }
+      } catch (err) {
+        console.log(`[FMP] Failed to fetch grades for ${holding.ticker}`);
+      }
+    }
+
     const updated = storage.updateQuoteData(id, quote);
     if (!updated) return res.status(500).json({ error: "Failed to update holding" });
 
-    res.json({ ...updated, profileUpdated: quote.profileUpdated });
+    res.json({ 
+      ...updated, 
+      profileUpdated: quote.profileUpdated,
+      gradesUpdated: quote.grades?.gradesUpdated,
+    });
   });
 
   // Check FMP API status

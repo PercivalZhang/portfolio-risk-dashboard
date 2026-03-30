@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+// Analyst grades data
+export interface Grades {
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+  consensus: 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell' | 'N/A';
+  lastUpdated: string;
+}
+
 // Holding with live market data stored locally
 export interface Holding {
   id: number;
@@ -22,6 +33,7 @@ export interface Holding {
   sma200?: number; // 200-day Simple Moving Average (priceAvg200 from FMP)
   marketCap?: number; // Optional, may not be available in all data sources
   logo?: string; // Company logo URL from FMP profile
+  grades?: Grades; // Analyst consensus grades
   lastUpdated: string; // ISO timestamp for price data
   lastUpdatedProfile?: string; // ISO timestamp for profile data (industry/sector/beta/logo)
 }
