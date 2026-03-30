@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { RefreshProgress } from "./RefreshProgress";
 import type { Holding } from "@shared/schema";
 import { Plus, Trash2, RefreshCw, RotateCw, Pencil, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -45,6 +46,15 @@ export function HoldingsInput({ holdings, onDelete }: { holdings: Holding[]; onD
   const [refreshingIds, setRefreshingIds] = useState<Set<number>>(new Set());
   // Track data updated flag for page refresh prompt
   const [dataUpdated, setDataUpdated] = useState(false);
+  
+  // Batch refresh progress state
+  const [refreshProgress, setRefreshProgress] = useState({
+    open: false,
+    total: 0,
+    current: 0,
+    currentTicker: "",
+    results: [] as { ticker: string; success: boolean; price?: number }[],
+  });
 
   // Calculate market values for sizing
   const holdingsWithValue = useMemo(() => {
@@ -115,6 +125,70 @@ export function HoldingsInput({ holdings, onDelete }: { holdings: Holding[]; onD
     createMutation.mutate({ ticker: ticker.trim().toUpperCase(), shares: s, costBasis: c });
   };
 
+  // Batch refresh with progress
+  const handleBatchRefresh = useCallback(async () => {
+    if (holdings.length === 0) return;
+    
+    setRefreshProgress({
+      open: true,
+      total: holdings.length,
+      current: 0,
+      currentTicker: "",
+      results: [],
+    });
+    
+    const results: { ticker: string; success: boolean; price?: number }[] = [];
+    
+    for (let i = 0; i < holdings.length; i++) {
+      const holding = holdings[i];
+      
+      setRefreshProgress(prev => ({
+        ...prev,
+        current: i,
+        currentTicker: holding.ticker,
+      }));
+      
+      try {
+        const res = await apiRequest("POST", `/api/holdings/${holding.id}/refresh`);
+        const data = await res.json();
+        results.push({ 
+          ticker: holding.ticker, 
+          success: true, 
+          price: data.currentPrice 
+        });
+      } catch (e: any) {
+        results.push({ 
+          ticker: holding.ticker, 
+          success: false 
+        });
+      }
+      
+      setRefreshProgress(prev => ({
+        ...prev,
+        results: [...results],
+      }));
+      
+      // Wait 200ms before next request (except for the last one)
+      if (i < holdings.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+    
+    // Complete
+    setRefreshProgress(prev => ({
+      ...prev,
+      current: holdings.length,
+      currentTicker: "",
+    }));
+    
+    // Wait a moment then close and refresh page
+    setTimeout(() => {
+      setRefreshProgress(prev => ({ ...prev, open: false }));
+      queryClient.invalidateQueries({ queryKey: ["/api/holdings"] });
+      setDataUpdated(true);
+    }, 1000);
+  }, [holdings]);
+
   const refreshSingle = async (id: number, ticker: string) => {
     if (refreshingIds.has(id)) return;
     
@@ -181,12 +255,12 @@ export function HoldingsInput({ holdings, onDelete }: { holdings: Holding[]; onD
             <Button
               size="sm"
               variant="outline"
-              onClick={() => refreshMutation.mutate()}
-              disabled={refreshMutation.isPending}
+              onClick={handleBatchRefresh}
+              disabled={refreshProgress.open}
               className="h-8 px-3 text-xs gap-1.5"
             >
-              <RefreshCw className={`w-3 h-3 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
-              {refreshMutation.isPending ? "刷新中..." : "刷新行情"}
+              <RefreshCw className={`w-3 h-3 ${refreshProgress.open ? "animate-spin" : ""}`} />
+              {refreshProgress.open ? "刷新中..." : "刷新行情"}
             </Button>
           </div>
         )}
@@ -394,6 +468,15 @@ export function HoldingsInput({ holdings, onDelete }: { holdings: Holding[]; onD
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Refresh Progress Dialog */}
+      <RefreshProgress
+        open={refreshProgress.open}
+        total={refreshProgress.total}
+        current={refreshProgress.current}
+        currentTicker={refreshProgress.currentTicker}
+        results={refreshProgress.results}
+      />
 
       {/* Data Updated - Page Refresh Dialog */}
       <Dialog open={dataUpdated} onOpenChange={() => {}}>
